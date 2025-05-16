@@ -13,25 +13,61 @@ const STANDARD_RIGHT_FACE_TABLE = {
 const RELATIVE_POS_TO_SYMBOL = {'back': '↑', 'right': '→', 'front': '↓', 'left': '←'};
 
 class Dice {
-    constructor(id, initialIntuitiveKey, config) {
+    constructor(id, initialStateConfig, config) { // initialStateConfig を受け取る
         this.id = id;
-        // config の期待する形式が変わる:
-        // config.charOrientationTargetFaceNumber: { 1: 5, 5: 3, ... } (上面の「面番号」がキー、向き先の「面番号」が値)
-        this.config = config; 
+        this.config = config;
 
         this.traditionalStateGraph = {};
         this.intuitiveToTraditionalMap = {};
         this.traditionalToIntuitiveMap = {};
         
-        this._generateTraditionalGraphAndMappings();
+        this._generateTraditionalGraphAndMappings(); // 先に全マッピングを生成
 
-        if (!this.intuitiveToTraditionalMap[initialIntuitiveKey]) {
-            // initialIntuitiveKeyがマッピングに存在しない場合、エラーメッセージを改善
-            const availableKeys = Object.keys(this.intuitiveToTraditionalMap).join(', ');
-            throw new Error(`Dice [${this.id}]: Initial intuitive key "${initialIntuitiveKey}" is invalid. Available intuitive keys based on config: [${availableKeys || 'None'}]`);
+        // initialStateConfig から初期の traditionalKey と intuitiveKey を設定
+        const { topFaceNumber, orientationSymbol } = initialStateConfig;
+        if (topFaceNumber === undefined || orientationSymbol === undefined) {
+            throw new Error(`Dice [${this.id}]: initialStateConfig must contain 'topFaceNumber' and 'orientationSymbol'.`);
         }
-        this.currentIntuitiveKey = initialIntuitiveKey;
-        this.currentTraditionalKey = this.intuitiveToTraditionalMap[initialIntuitiveKey];
+        if (!this.config.faceSymbols[topFaceNumber]) {
+            throw new Error(`Dice [${this.id}]: initialStateConfig.topFaceNumber '${topFaceNumber}' does not have a symbol defined in faceSymbols.`);
+        }
+
+        let foundInitialTraditionalKey = null;
+        // 全ての伝統的状態をチェック
+        for (const traditionalKey in this.traditionalStateGraph) {
+            const stateDetails = this.traditionalStateGraph[traditionalKey];
+            const currentTopFaceNumber = stateDetails.faces.top;
+
+            if (currentTopFaceNumber === topFaceNumber) { // 指定された面番号が上面に来ているか
+                // この状態で、指定された orientationSymbol が実現されるか確認
+                const intuitiveKeyForThisState = this.traditionalToIntuitiveMap[traditionalKey];
+                if (intuitiveKeyForThisState) {
+                    const actualSymbol = this.config.faceSymbols[currentTopFaceNumber];
+                    const expectedIntuitiveKey = `${actualSymbol}${orientationSymbol}`;
+                    if (intuitiveKeyForThisState === expectedIntuitiveKey) {
+                        foundInitialTraditionalKey = traditionalKey;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!foundInitialTraditionalKey) {
+            const availableStatesInfo = Object.entries(this.traditionalToIntuitiveMap)
+                .map(([tradKey, intKey]) => {
+                    const topNum = this.traditionalStateGraph[tradKey].faces.top;
+                    return `TradKey: ${tradKey} (TopFaceNum: ${topNum}) -> IntuitiveKey: ${intKey}`;
+                })
+                .join('\n');
+            throw new Error(`Dice [${this.id}]: Could not find a valid traditional state for initialStateConfig { topFaceNumber: ${topFaceNumber}, orientationSymbol: '${orientationSymbol}' }. No state matches these criteria. Check your charOrientationTargetFaceNumber settings.\nAvailable mappings:\n${availableStatesInfo}`);
+        }
+
+        this.currentTraditionalKey = foundInitialTraditionalKey;
+        this.currentIntuitiveKey = this.traditionalToIntuitiveMap[foundInitialTraditionalKey];
+        
+        if (!this.currentIntuitiveKey) { //念のため
+            throw new Error(`Dice [${this.id}]: Internal error - intuitive key not found for derived traditional key ${this.currentTraditionalKey}`);
+        }
 
         this.displayElements = null;
     }
