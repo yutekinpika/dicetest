@@ -48,24 +48,21 @@
             const configs = [
                 {
                     id: 'dice1',
-                    // 初期状態: 物理的な面1を上面にし、その文字が奥(↑)を向くようにする
-                    initialState: { topFaceNumber: 1, orientationSymbol: '↑' },
+                    initialState: { topFaceNumber: 1, orientationCode: 0 }, // 0: 奥(↑)
                     faceSymbols: { 1: '1', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6' },
                     faceColors: { 1: 'red', 2: 'white', 3: 'red', 4: 'white', 5: 'red', 6: 'white' },
                     charOrientationTargetFaceNumber: { 1: 5, 5: 3, 3: 6, 6: 2, 2: 4, 4: 1 }
                 },
                 {
                     id: 'dice2',
-                    // 初期状態: 物理的な面1を上面にし、その文字が手前(↓)を向くようにする
-                    initialState: { topFaceNumber: 1, orientationSymbol: '↓' },
+                    initialState: { topFaceNumber: 1, orientationCode: 2 }, // 2: 手前(↓)
                     faceSymbols: { 1: 'A', 2: 'B', 3: 'C', 4: 'D', 5: 'E', 6: 'F' },
                     faceColors: { 1: 'white', 2: 'white', 3: 'white', 4: 'white', 5: 'white', 6: 'white' },
                     charOrientationTargetFaceNumber: { 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 1 }
                 },
                 {
                     id: 'dice3-same-symbols',
-                    // 初期状態: 物理的な面1 (シンボル'X') を上面にし、その文字が奥(↑)を向くようにする
-                    initialState: { topFaceNumber: 1, orientationSymbol: '↑' },
+                    initialState: { topFaceNumber: 1, orientationCode: 0 }, // 0: 奥(↑)
                     faceSymbols: { 1: 'X', 2: 'Y', 3: 'X', 4: 'Y', 5: 'X', 6: 'Y' },
                     faceColors: { 1: 'red', 2: 'white', 3: 'red', 4: 'white', 5: 'red', 6: 'white'},
                     charOrientationTargetFaceNumber: {
@@ -75,8 +72,7 @@
                 },
                 { // 同じシンボルXを持つ面3を初期上面にしたい場合
                     id: 'dice4-same-symbols-alt-initial',
-                    // 初期状態: 物理的な面3 (シンボル'X') を上面にし、その文字が右(→)を向くようにする
-                    initialState: { topFaceNumber: 3, orientationSymbol: '→' },
+                    initialState: { topFaceNumber: 3, orientationCode: 1 }, // 1: 右(→)
                     faceSymbols: { 1: 'X', 2: 'Y', 3: 'X', 4: 'Y', 5: 'X', 6: 'Y' }, // dice3と同じシンボル
                     faceColors: { 1: 'red', 2: 'white', 3: 'red', 4: 'white', 5: 'red', 6: 'white'},
                     charOrientationTargetFaceNumber: { // dice3と同じ向きルール
@@ -93,10 +89,8 @@
                 const baseConfig = configs[baseConfigIndex % configs.length];
                 const newIdNumber = configs.length + 1;
                 
-                // 新しい初期状態を適切に設定 (例: 面1を上に、↑向き)
-                // もしシンボルが同じでも、どの物理面を初期上面にするかで区別できる
-                let newInitialState = { topFaceNumber: 1, orientationSymbol: '↑' };
-                if (baseConfig.initialState) { // ベースがあればそれをコピー
+                let newInitialState = { topFaceNumber: 1, orientationCode: 0 }; // デフォルト
+                if (baseConfig.initialState) {
                     newInitialState = { ...baseConfig.initialState };
                 }
 

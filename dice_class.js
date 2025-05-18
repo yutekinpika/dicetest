@@ -1,6 +1,6 @@
 // dice_class.js
 
-const OPPOSITE_FACE_SUM = 7; // 標準的なサイコロの対面の和
+const OPPOSITE_FACE_SUM = 7;
 // (上面番号, 手前面番号) -> 右面番号 の対応表 (標準的なサイコロの物理的な面配置)
 const STANDARD_RIGHT_FACE_TABLE = {
     "1-2": 3, "1-3": 5, "1-4": 2, "1-5": 4,
@@ -10,10 +10,25 @@ const STANDARD_RIGHT_FACE_TABLE = {
     "5-1": 3, "5-2": 4, "5-3": 6, "5-4": 1,
     "6-2": 4, "6-3": 2, "6-4": 5, "6-5": 3
 };
-const RELATIVE_POS_TO_SYMBOL = {'back': '↑', 'right': '→', 'front': '↓', 'left': '←'};
+
+// 向きの定義
+const ORIENTATION_CODES = { // 数値コード -> 向きシンボルと相対位置
+    0: { symbol: '↑', relativePos: 'back' },  // 奥
+    1: { symbol: '→', relativePos: 'right' }, // 右
+    2: { symbol: '↓', relativePos: 'front' }, // 手前
+    3: { symbol: '←', relativePos: 'left' }   // 左
+};
+// 逆引きマップ (相対位置 -> 数値コード)
+const RELATIVE_POS_TO_ORIENTATION_CODE = {};
+Object.keys(ORIENTATION_CODES).forEach(code => {
+    RELATIVE_POS_TO_ORIENTATION_CODE[ORIENTATION_CODES[code].relativePos] = parseInt(code);
+});
+// 以前のマップも残しておくか、必要なら ORIENTATION_CODES から導出
+const RELATIVE_POS_TO_SYMBOL = {};
+Object.values(ORIENTATION_CODES).forEach(obj => RELATIVE_POS_TO_SYMBOL[obj.relativePos] = obj.symbol);
 
 class Dice {
-    constructor(id, initialStateConfig, config) { // initialStateConfig を受け取る
+    constructor(id, initialStateConfig, config) {
         this.id = id;
         this.config = config;
 
@@ -21,30 +36,35 @@ class Dice {
         this.intuitiveToTraditionalMap = {};
         this.traditionalToIntuitiveMap = {};
         
-        this._generateTraditionalGraphAndMappings(); // 先に全マッピングを生成
+        this._generateTraditionalGraphAndMappings();
 
         // initialStateConfig から初期の traditionalKey と intuitiveKey を設定
-        const { topFaceNumber, orientationSymbol } = initialStateConfig;
-        if (topFaceNumber === undefined || orientationSymbol === undefined) {
-            throw new Error(`Dice [${this.id}]: initialStateConfig must contain 'topFaceNumber' and 'orientationSymbol'.`);
+        const { topFaceNumber, orientationCode } = initialStateConfig; // orientationSymbol -> orientationCode
+        if (topFaceNumber === undefined || orientationCode === undefined) {
+            throw new Error(`Dice [${this.id}]: initialStateConfig must contain 'topFaceNumber' and 'orientationCode'.`);
+        }
+        if (orientationCode < 0 || orientationCode > 3 || !ORIENTATION_CODES[orientationCode]) {
+            throw new Error(`Dice [${this.id}]: initialStateConfig.orientationCode '${orientationCode}' is invalid. Must be 0 (Up), 1 (Right), 2 (Down), or 3 (Left).`);
         }
         if (!this.config.faceSymbols[topFaceNumber]) {
             throw new Error(`Dice [${this.id}]: initialStateConfig.topFaceNumber '${topFaceNumber}' does not have a symbol defined in faceSymbols.`);
         }
 
+        const expectedOrientationSymbol = ORIENTATION_CODES[orientationCode].symbol; // コードから期待するシンボルを取得
+
         let foundInitialTraditionalKey = null;
-        // 全ての伝統的状態をチェック
         for (const traditionalKey in this.traditionalStateGraph) {
             const stateDetails = this.traditionalStateGraph[traditionalKey];
             const currentTopFaceNumber = stateDetails.faces.top;
 
-            if (currentTopFaceNumber === topFaceNumber) { // 指定された面番号が上面に来ているか
-                // この状態で、指定された orientationSymbol が実現されるか確認
+            if (currentTopFaceNumber === topFaceNumber) {
                 const intuitiveKeyForThisState = this.traditionalToIntuitiveMap[traditionalKey];
                 if (intuitiveKeyForThisState) {
-                    const actualSymbol = this.config.faceSymbols[currentTopFaceNumber];
-                    const expectedIntuitiveKey = `${actualSymbol}${orientationSymbol}`;
-                    if (intuitiveKeyForThisState === expectedIntuitiveKey) {
+                    const actualSymbolOnTop = this.config.faceSymbols[currentTopFaceNumber];
+                    // 直感的キーは "シンボル+向きシンボル" なので、向きシンボル部分を比較
+                    const actualOrientationSymbolInKey = intuitiveKeyForThisState.slice(actualSymbolOnTop.length);
+                    
+                    if (actualOrientationSymbolInKey === expectedOrientationSymbol) {
                         foundInitialTraditionalKey = traditionalKey;
                         break;
                     }
@@ -59,13 +79,13 @@ class Dice {
                     return `TradKey: ${tradKey} (TopFaceNum: ${topNum}) -> IntuitiveKey: ${intKey}`;
                 })
                 .join('\n');
-            throw new Error(`Dice [${this.id}]: Could not find a valid traditional state for initialStateConfig { topFaceNumber: ${topFaceNumber}, orientationSymbol: '${orientationSymbol}' }. No state matches these criteria. Check your charOrientationTargetFaceNumber settings.\nAvailable mappings:\n${availableStatesInfo}`);
+            throw new Error(`Dice [${this.id}]: Could not find a valid traditional state for initialStateConfig { topFaceNumber: ${topFaceNumber}, orientationCode: ${orientationCode} (resolves to symbol '${expectedOrientationSymbol}') }. No state matches these criteria. Check your charOrientationTargetFaceNumber settings.\nAvailable mappings:\n${availableStatesInfo}`);
         }
 
         this.currentTraditionalKey = foundInitialTraditionalKey;
         this.currentIntuitiveKey = this.traditionalToIntuitiveMap[foundInitialTraditionalKey];
         
-        if (!this.currentIntuitiveKey) { //念のため
+        if (!this.currentIntuitiveKey) {
             throw new Error(`Dice [${this.id}]: Internal error - intuitive key not found for derived traditional key ${this.currentTraditionalKey}`);
         }
 
@@ -75,8 +95,7 @@ class Dice {
     _getOppositeFaceNumber(faceNumber) {
         return OPPOSITE_FACE_SUM - faceNumber;
     }
-
-
+    
     _generateTraditionalGraphAndMappings() {
         // 1. 物理的な面番号に基づいた伝統的グラフを生成 (変更なし)
         Object.keys(STANDARD_RIGHT_FACE_TABLE).forEach(key => {
@@ -121,13 +140,14 @@ class Dice {
                 return;
             }
 
+            let charDirectionSymbol = null; // これは '↑', '→', '↓', '←' のまま
+            let charOrientationCode = -1;   // 数値コードも決定する
 
-            let charDirectionSymbol = null;
-            // 現在のサイコロの向きにおいて、targetFaceNumberForOrientation がどの相対位置（奥、右、手前、左）にあるかを確認
-            for (const pos of ['back', 'right', 'front', 'left']) { 
-                const faceNumberAtPos = faceNumbers[pos]; // その相対位置にある面の「番号」
+            for (const relPos of ['back', 'right', 'front', 'left']) { 
+                const faceNumberAtPos = faceNumbers[relPos];
                 if (faceNumberAtPos === targetFaceNumberForOrientation) {
-                    charDirectionSymbol = RELATIVE_POS_TO_SYMBOL[pos];
+                    charDirectionSymbol = ORIENTATION_CODES[RELATIVE_POS_TO_ORIENTATION_CODE[relPos]].symbol;
+                    // charOrientationCode = RELATIVE_POS_TO_ORIENTATION_CODE[relPos]; // この行は直感的キー生成には直接不要だが、デバッグや内部ロジックで使える
                     break;
                 }
             }
