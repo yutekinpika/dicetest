@@ -2,12 +2,60 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Dice Board Test</title>
+    <title>Board</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #game-board-container {
+            display: grid;
+            grid-template-columns: repeat(3, 70px); /* 各マスの幅 */
+            grid-template-rows: repeat(3, 70px);    /* 各マスの高さ */
+            border: 1px solid black;
+            margin-top: 20px;
+        }
+        .board-cell {
+            width: 70px;
+            height: 70px;
+            border: 1px solid #ccc;
+            box-sizing: border-box; /* paddingやborderをwidth/heightに含める */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative; /* サイコロID表示のため */
+            cursor: pointer; /* クリック可能であることを示す */
+        }
+        .board-cell img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain; /* アスペクト比を保って収める */
+        }
+        .dice-id-overlay {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            font-size: 10px;
+            color: blue;
+            background-color: rgba(255, 255, 255, 0.7);
+            padding: 1px 3px;
+            border-radius: 3px;
+        }
+    </style>
 </head>
 <body>
-    <h1>Test</h1>
-    <p>コンソールを開いて結果を確認してください。</p>
-    <script type="module" src="diceBoard.js"></script> 
-    <!-- または、メインの処理を書いたファイル (例: main.js) を指定 -->
+    <h1>Board</h1>
+    <div id="info-area">
+        <p>Click on a dice to roll it (if possible).</p>
+        <p>Preferred roll order: North, East, South, West.</p>
+    </div>
+    <div id="game-board-container">
+        <!-- JavaScriptで盤面が描画されます -->
+    </div>
+    <button id="reset-button">Reset Board</button>
+
+    <script type="module" src="main.js"></script> <!-- メインのJSファイルを指定 -->
 </body>
 </html>
